@@ -1,9 +1,9 @@
 CC=gcc
 
 test: window-bit-count-apx.h test.c
-	$(CC) -O0 test.c -o test.o -lm
+	$(CC) -O0 test.c -o test.o -lm -g
 	./test.o
 
 bench: window-bit-count-apx.h bench.c
-	$(CC) -O0 bench.c -o bench.o -lm
+	$(CC) -O0 bench.c -o bench.o -lm 
 	./bench.o

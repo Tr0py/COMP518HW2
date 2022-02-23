@@ -47,6 +47,7 @@ int main() {
         wnd_bit_count_apx_destruct(&state_apx);
         wnd_bit_count_destruct(&state);
     }
+    printf("test passed!\n");
 
     return 0;
 }
