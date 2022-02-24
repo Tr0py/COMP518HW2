@@ -9,6 +9,7 @@
 #include <math.h>
 #include <string.h>
 
+//#define DEBUG
 #ifdef DEBUG
 #define DBG(x, ...) printf("[Debug]%s:%d\t"x, __func__, __LINE__, ##__VA_ARGS__)
 #else
@@ -34,7 +35,7 @@ void init_group(group_t *self, int idx, int k) {
     assert(self != NULL);
     self->idx = idx;
     self->buckets = (int*) malloc((k + 1) * sizeof(int));
-    memset(self->buckets, 0, sizeof((k + 1) * sizeof(int)));
+    memset(self->buckets, 0, ((k + 1) * sizeof(int)));
     //DBG("memset len: %d\n", sizeof(self->buckets));
     assert(self->buckets != NULL);
     self->head = self->tail = 0;
@@ -59,6 +60,7 @@ int group_add(group_t* grp, int ts) {
     DBG("adding item %d to group %d\n", ts, grp->idx);
     if (grp->n_vallid == (grp->k +1)) {
         // merge: keep the latest timestamp
+        N_MERGES++;
         group_bpop(grp);
         emit = group_bpop(grp);
     }
@@ -90,12 +92,15 @@ inline int group_get_sum(group_t* grp) {
  * @param grp 
  * @param time 
  * @param w 
- * @return int 
+ * @return the number of 1's expired
+ * @retval -1 this group is empty 
  */
 int group_check_expire(group_t *grp, int time, int w) {
     int ret = 0;
     int expired = 0;
 
+    if (grp->n_vallid == 0) 
+        return -1;
     assert(grp->n_vallid > 0);
 
         DBG("checking grp %d bucket of time %d\n", grp->idx, grp->buckets[grp->tail]);
@@ -152,6 +157,7 @@ uint64_t wnd_bit_count_apx_new(StateApx* self, uint32_t wnd_size, uint32_t k) {
     assert(wnd_size >= 1);
     assert(k >= 1);
 
+    N_MERGES = 0;
     ngroup = calculate_num_groups(wnd_size, k);
     nbytes = ngroup * sizeof(group_t);
     nbytes += ngroup * (k+1) * sizeof(int);
@@ -199,7 +205,7 @@ void wnd_bit_count_apx_print(StateApx* self) {
 
 uint32_t wnd_bit_count_apx_next(StateApx* self, bool item) {
     int i = 0;
-    int input_item;
+    int input_item, num_expire;
     self->time++;
     input_item = self->time;
     if (item == 1) {
@@ -214,8 +220,26 @@ uint32_t wnd_bit_count_apx_next(StateApx* self, bool item) {
         }
     }
 
-    self->sum -= group_check_expire(&(self->groups[self->last_grp]), self->time, self->w);
 
+    do {
+        num_expire = group_check_expire(&(self->groups[self->last_grp]), self->time, self->w);
+        if (num_expire < 0) {
+            if (self->last_grp == 0) {
+                // this means the 0th group is also empty.
+                DBG("All empty!\n");
+                num_expire = 0;
+            }
+            else {
+                self->last_grp--;
+            }
+        }
+        DBG("last group is %d", self->last_grp);
+        assert(self->last_grp >= 0);
+    } while (num_expire < 0);
+    
+    self->sum -= num_expire;
+
+    DBG("self sum = %d\n", self->sum);
     return self->sum - self->groups[self->last_grp].bucket_size + 1;
 }
 

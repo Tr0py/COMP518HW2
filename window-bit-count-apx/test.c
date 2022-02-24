@@ -1,12 +1,14 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <math.h>
 #include <stdint.h>
 #include <assert.h>
 #include "window-bit-count-apx.h"
 #include "../window-bit-count/window-bit-count.h"
+#include <time.h>
 
 #define W 200 // window size
-#define N 1000 // stream length
+#define N 1000000 // stream length
 #define K 100 // relative error = 1 / K
 
 int main() {
@@ -24,17 +26,27 @@ int main() {
         wnd_bit_count_print(&state);
 
         wnd_bit_count_apx_new(&state_apx, W, K);
+#ifdef DEBUG
         wnd_bit_count_apx_print(&state_apx);
+#endif
 
+        // randomize input
+        time_t timer;
+        srand((unsigned) time(&timer));
         for (uint32_t i=1; i<=N; i++) {
             bool item = true; //i % 2;
+            // randomize input
+            item = rand() % 2;
+
             last_output = wnd_bit_count_next(&state, item);
             last_output_apx = wnd_bit_count_apx_next(&state_apx, item);
-            //wnd_bit_count_apx_print(&state_apx);
+#ifdef DEBUG
+            wnd_bit_count_apx_print(&state_apx);
 
-            //printf("last output (precise) = %u\n", last_output);
-            //printf("last output (approximate) = %u\n", last_output_apx);
-            //printf("\n");
+            printf("last output (precise) = %u\n", last_output);
+            printf("last output (approximate) = %u\n", last_output_apx);
+            printf("\n");
+#endif
 
             assert(last_output >= last_output_apx);
             uint32_t error_abs = last_output - last_output_apx;
